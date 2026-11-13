@@ -338,10 +338,8 @@ html { scroll-behavior: smooth; }
 .incognito-target svg { animation: incognito-wobble 1.6s ease-in-out infinite; }
 .incognito-target.is-hit svg { animation: incognito-hit .35s ease-out forwards; }
 .incognito-target.is-hit { color: var(--accent); }
-.incognito-target.is-escaping { animation: incognito-escape .5s ease-in forwards; }
 
 @keyframes incognito-appear { from { opacity: 0; } }
-@keyframes incognito-escape { to { opacity: 0; } }
 @keyframes incognito-wobble { 50% { rotate: 8deg; } }
 @keyframes incognito-hit { to { scale: 2; rotate: 90deg; opacity: 0; } }
 

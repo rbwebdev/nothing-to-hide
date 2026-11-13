@@ -2,7 +2,10 @@
 
 /* ---------- Language ---------- */
 
-const LANG = (navigator.languages?.[0] || navigator.language || 'en').toLowerCase().startsWith('fr') ? 'fr' : 'en';
+// Set to null to follow the browser language (French translations below are kept for that).
+const FORCED_LANG = 'en';
+const DETECTED_LANG = (navigator.languages?.[0] || navigator.language || 'en').toLowerCase().startsWith('fr') ? 'fr' : 'en';
+const LANG = FORCED_LANG ?? DETECTED_LANG;
 const LOCALE = LANG === 'fr' ? 'fr-FR' : 'en-US';
 const t = (english, french) => (LANG === 'fr' ? french : english);
 
@@ -1827,7 +1830,7 @@ function startIncognitoHunt() {
     const FIRST_SPAWN_DELAY_MS = 2000;
     const MIN_RESPAWN_DELAY_MS = 6000;
     const MAX_RESPAWN_DELAY_MS = 15000;
-    const LIFETIME_MS = 12000;
+    const MAX_ALIVE_TARGETS = 5;
     const ICON_SIZE_PX = 48;
     const MIN_SPEED_PX_PER_S = 25;
     const MAX_SPEED_PX_PER_S = 50;
@@ -1838,10 +1841,28 @@ function startIncognitoHunt() {
     const isMotionReduced = matchesMedia('(prefers-reduced-motion: reduce)');
     const laserLayer = document.getElementById('laser-layer');
     let eliminatedCount = 0;
+    let aliveCount = 0;
+    let pendingSpawnTimer = null;
 
     const randomBetween = (min, max) => min + Math.random() * (max - min);
-    const scheduleSpawn = (delay) => setTimeout(spawnIncognito, delay);
+    const scheduleSpawn = (delay) => {
+        pendingSpawnTimer = setTimeout(spawnAndScheduleNext, delay);
+    };
     const scheduleNextSpawn = () => scheduleSpawn(randomBetween(MIN_RESPAWN_DELAY_MS, MAX_RESPAWN_DELAY_MS));
+
+    function spawnAndScheduleNext() {
+        pendingSpawnTimer = null;
+        spawnIncognito();
+        if (aliveCount < MAX_ALIVE_TARGETS) {
+            scheduleNextSpawn();
+        }
+    }
+
+    function resumeSpawningIfPaused() {
+        if (pendingSpawnTimer === null) {
+            scheduleNextSpawn();
+        }
+    }
 
     function eyeCenter() {
         const eyeBounds = document.getElementById('hero-eye').getBoundingClientRect();
@@ -1875,9 +1896,9 @@ function startIncognitoHunt() {
         let { x, y } = pickBottomCornerSpawnPoint();
         let heading = randomBetween(0, Math.PI * 2);
         const speed = isMotionReduced ? 0 : randomBetween(MIN_SPEED_PX_PER_S, MAX_SPEED_PX_PER_S);
-        let aliveFor = 0;
         let lastFrameAt = null;
         let isEnded = false;
+        aliveCount++;
 
         const target = document.createElement('button');
         target.type = 'button';
@@ -1907,7 +1928,8 @@ function startIncognitoHunt() {
             target.disabled = true;
             target.classList.add(endingClass);
             target.addEventListener('animationend', () => target.remove(), { once: true });
-            scheduleNextSpawn();
+            aliveCount--;
+            resumeSpawningIfPaused();
         };
         const wander = (frameAt) => {
             if (isEnded) {
@@ -1915,12 +1937,6 @@ function startIncognitoHunt() {
             }
             const elapsedSeconds = lastFrameAt === null ? 0 : Math.min((frameAt - lastFrameAt) / 1000, 0.1);
             lastFrameAt = frameAt;
-            aliveFor += elapsedSeconds * 1000;
-            if (aliveFor > LIFETIME_MS) {
-                endWith('is-escaping');
-                showToast(t('It got away. Incognito is still watching… or is it?', 'Elle s\'est échappée. La navigation privée veille toujours… ou pas ?'));
-                return;
-            }
             heading += randomBetween(-MAX_TURN_RAD_PER_S, MAX_TURN_RAD_PER_S) * elapsedSeconds;
             x += Math.cos(heading) * speed * elapsedSeconds;
             y += Math.sin(heading) * speed * elapsedSeconds;
@@ -1948,11 +1964,25 @@ function startIncognitoHunt() {
     scheduleSpawn(FIRST_SPAWN_DELAY_MS);
 }
 
+function clearUrlHash() {
+    if (!window.location.hash) {
+        return;
+    }
+    try {
+        history.replaceState(null, '', window.location.href.split('#')[0]);
+    } catch (error) {
+        // Some browsers refuse replaceState on file:// pages; an empty hash still drops the anchor.
+        console.error('Cannot clear URL hash with replaceState', error);
+        window.location.hash = '';
+    }
+}
+
 function showWelcome(fingerprintHash) {
     const revealPage = () => {
         document.getElementById('intro').remove();
         document.getElementById('page').hidden = false;
-        expandBlockFromUrlHash()?.scrollIntoView();
+        clearUrlHash();
+        window.scrollTo({ top: 0 });
         setUpInteractionFeedback();
         setUpAttentionFeedback();
         startIncognitoHunt();
