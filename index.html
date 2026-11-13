@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="robots" content="noindex">
+    <title>Nothing to Hide?</title>
+    <meta name="description" content="Open this page. Don't click anything.">
+    <meta property="og:type" content="website">
+    <meta property="og:title" content="Nothing to Hide?">
+    <meta property="og:description" content="Open this page. Don't click anything.">
+    <meta name="twitter:card" content="summary">
+    <meta name="twitter:title" content="Nothing to Hide?">
+    <meta name="twitter:description" content="Open this page. Don't click anything.">
+    <link rel="icon" href="assets/eye.svg" type="image/svg+xml">
+    <link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<div id="intro" class="intro" aria-live="polite">
+    <div id="intro-loader" class="intro-loader" role="status" aria-label="Loading"></div>
+    <div id="intro-welcome" class="intro-welcome" hidden>
+        <p class="intro-greeting" data-i18n="intro-greeting">Welcome <span id="intro-fingerprint" class="intro-fingerprint"></span></p>
+        <button id="intro-reveal" class="intro-reveal" type="button" title="What is this?" aria-label="What is this?">?</button>
+    </div>
+</div>
+
+<div id="page" hidden>
+<svg id="hero-eye" class="hero-eye" viewBox="0 12 64 40" width="160" height="100" aria-hidden="true">
+    <defs>
+        <clipPath id="hero-eye-lids"><path d="M4 32 Q32 2 60 32 Q32 62 4 32 Z"/></clipPath>
+    </defs>
+    <g class="hero-eye-globe">
+        <path d="M4 32 Q32 2 60 32 Q32 62 4 32 Z" fill="#181b24"/>
+        <g clip-path="url(#hero-eye-lids)">
+            <g id="hero-eye-iris" class="hero-eye-iris">
+                <circle cx="32" cy="32" r="14" fill="#ff5c5c"/>
+                <circle cx="32" cy="32" r="10" fill="none" stroke="#0f1117" stroke-width="1.5" stroke-dasharray="2 2"/>
+                <circle cx="32" cy="32" r="6.5" fill="#0f1117"/>
+                <circle cx="27.5" cy="27.5" r="2.5" fill="#ffffff"/>
+            </g>
+        </g>
+        <path d="M4 32 Q32 2 60 32 Q32 62 4 32 Z" fill="none" stroke="#ff5c5c" stroke-width="4" stroke-linejoin="round"/>
+    </g>
+</svg>
+<header class="hero">
+    <h1 data-i18n="hero-title">Incognito? Cute.</h1>
+    <p id="portrait" class="portrait"></p>
+    <hr class="hero-separator">
+    <p class="hero-intro" data-i18n="hero-intro">
+        You didn't click anything, accept anything or type anything. Yet here is everything a website can learn
+        about you in a few milliseconds. Combined, these details form a <strong>fingerprint</strong> that recognises
+        you from one site to the next, even without cookies, and that "invisible" CAPTCHAs use to decide whether
+        you are human.
+    </p>
+    <p class="privacy-note" data-i18n="privacy-note">
+        This page is a plain file with no server: everything is computed in your browser, then forgotten when you close it.
+        Only your IP is seen by a geolocation service (<code>freeipapi.com</code>, falling back to <code>ipapi.co</code>
+        or <code>ipwho.is</code>).
+    </p>
+    <nav id="section-menu" class="section-menu" aria-label="Sections"></nav>
+    <div class="hero-aside">
+        <p data-i18n="hero-aside-server">
+            A real website also sees, server side and <strong>even if you block JavaScript</strong>: your IP, the HTTP headers
+            of every request and the fingerprint of your encrypted connection (TLS), widely used by anti-bot systems.
+        </p>
+        <p data-i18n="hero-aside-advice">
+            To shrink your fingerprint: a browser that standardises or scrambles these values (Tor Browser, Mullvad Browser,
+            Brave, Firefox with <code>privacy.resistFingerprinting</code>), a VPN for the IP, and refusing needless permissions.
+            Paradox: too many anti-tracking extensions often make your fingerprint <em>more</em> unique.
+        </p>
+    </div>
+    <div id="fingerprint" class="fingerprint"></div>
+</header>
+
+<main id="sections" class="sections"></main>
+
+<button id="back-to-top" class="back-to-top" type="button" title="Back to top" aria-label="Back to top" hidden>↑</button>
+</div>
+
+<div id="toasts" class="toasts" aria-live="off"></div>
+<svg id="laser-layer" class="laser-layer" aria-hidden="true"></svg>
+
+<script src="assets/app.js"></script>
+</body>
+</html>
