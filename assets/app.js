@@ -1636,20 +1636,27 @@ function setUpAttentionFeedback() {
     announceArrival();
 }
 
-function setUpInteractionFeedback() {
-    const showRipple = (x, y) => {
-        const ripple = document.createElement('span');
-        ripple.className = 'click-ripple';
-        ripple.style.left = `${x}px`;
-        ripple.style.top = `${y}px`;
-        const removeWhenInnerWaveEnds = (event) => {
-            if (event.pseudoElement) {
-                ripple.remove();
-            }
-        };
-        ripple.addEventListener('animationend', removeWhenInnerWaveEnds);
-        document.body.appendChild(ripple);
+// Expanding double ring centred on (x, y). `radiusPx` overrides the default size (set in CSS).
+function showRipple(x, y, { radiusPx, extraClass } = {}) {
+    const ripple = document.createElement('span');
+    ripple.className = extraClass ? `click-ripple ${extraClass}` : 'click-ripple';
+    ripple.style.left = `${x}px`;
+    ripple.style.top = `${y}px`;
+    if (radiusPx) {
+        ripple.style.width = `${radiusPx * 2}px`;
+        ripple.style.height = `${radiusPx * 2}px`;
+        ripple.style.margin = `${-radiusPx}px 0 0 ${-radiusPx}px`;
+    }
+    const removeWhenInnerWaveEnds = (event) => {
+        if (event.pseudoElement) {
+            ripple.remove();
+        }
     };
+    ripple.addEventListener('animationend', removeWhenInnerWaveEnds);
+    document.body.appendChild(ripple);
+}
+
+function setUpInteractionFeedback() {
     const describeKey = (key) => (key === ' ' ? t('Space', 'Espace') : key);
     const reportClick = (event) => {
         showRipple(event.clientX, event.clientY);
@@ -2081,6 +2088,9 @@ function setUpIncognitoGame(ambientHunt, fingerprintHash) {
     const TURN_RATE_RAD_PER_S = 2.2;
     const JITTER_RAD_PER_S = 1.5;
     const EYE_HIT_RADIUS_PX = 50;
+    const CORNER_SPREAD_RATIO = 0.15;
+    // Matches the .eye-shockwave animation: attackers pop as the ring sweeps over them.
+    const SHOCKWAVE_DURATION_MS = 700;
     const HALF_SIZE = INCOGNITO_SIZE_PX / 2;
 
     const eye = document.getElementById('hero-eye');
@@ -2116,20 +2126,22 @@ function setUpIncognitoGame(ambientHunt, fingerprintHash) {
         };
     }
 
-    function pickEdgeSpawnPoint() {
+    // Spawn close to a screen corner (on either edge next to it): the farthest points from the centred eye.
+    function pickCornerSpawnPoint() {
         const maxX = window.innerWidth - INCOGNITO_SIZE_PX;
         const maxY = window.innerHeight - INCOGNITO_SIZE_PX;
-        const edges = [
-            () => ({ x: randomBetween(0, maxX), y: 0 }),
-            () => ({ x: randomBetween(0, maxX), y: maxY }),
-            () => ({ x: 0, y: randomBetween(0, maxY) }),
-            () => ({ x: maxX, y: randomBetween(0, maxY) }),
-        ];
-        return edges[Math.floor(Math.random() * edges.length)]();
+        const isLeft = Math.random() < 0.5;
+        const isTop = Math.random() < 0.5;
+        const offsetX = randomBetween(0, maxX * CORNER_SPREAD_RATIO);
+        const offsetY = randomBetween(0, maxY * CORNER_SPREAD_RATIO);
+        const isOnHorizontalEdge = Math.random() < 0.5;
+        const x = isOnHorizontalEdge ? offsetX : 0;
+        const y = isOnHorizontalEdge ? 0 : offsetY;
+        return { x: isLeft ? x : maxX - x, y: isTop ? y : maxY - y };
     }
 
     function spawnAttacker(speed) {
-        const { x, y } = pickEdgeSpawnPoint();
+        const { x, y } = pickCornerSpawnPoint();
         const eyePoint = eyeCenter();
         const attacker = {
             target: createIncognitoTarget(),
@@ -2170,7 +2182,26 @@ function setUpIncognitoGame(ambientHunt, fingerprintHash) {
         eye.classList.add('is-damaged');
         if (game.lives <= 0) {
             finishGame();
+            return;
         }
+        releaseShockwave();
+    }
+
+    // Breathing room after a hit: a wave from the eye wipes every attacker (no points) and the difficulty restarts.
+    function releaseShockwave() {
+        const eyePoint = eyeCenter();
+        const radiusPx = Math.hypot(window.innerWidth, window.innerHeight);
+        showRipple(eyePoint.x, eyePoint.y, { radiusPx, extraClass: 'eye-shockwave' });
+        [...game.attackers].forEach((attacker) => {
+            const center = incognitoTargetCenter(attacker.target);
+            const distanceRatio = Math.hypot(center.x - eyePoint.x, center.y - eyePoint.y) / radiusPx;
+            attacker.isEnded = true; // Frozen and harmless until the wave reaches it.
+            game.attackers.delete(attacker);
+            setTimeout(() => retireIncognitoTarget(attacker.target, 'is-hit'), distanceRatio * SHOCKWAVE_DURATION_MS);
+        });
+        const now = performance.now();
+        game.startedAt = now;
+        game.nextSpawnAt = now + FIRST_SPAWN_DELAY_MS + SHOCKWAVE_DURATION_MS;
     }
 
     function moveAttacker(attacker, eyePoint, elapsedSeconds) {
@@ -2197,6 +2228,9 @@ function setUpIncognitoGame(ambientHunt, fingerprintHash) {
         }
         const eyePoint = eyeCenter();
         for (const attacker of [...game.attackers]) {
+            if (attacker.isEnded) {
+                continue; // Already swept away by a shockwave earlier in this frame.
+            }
             if (moveAttacker(attacker, eyePoint, elapsedSeconds)) {
                 hurtEye(attacker);
                 if (game.isOver) {

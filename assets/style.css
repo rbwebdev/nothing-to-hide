@@ -266,8 +266,8 @@ html { scroll-behavior: smooth; }
     max-width: calc(100vw - 6rem);
     display: flex;
     flex-direction: column;
-    /* Stretch so both buttons take the width of the widest one. */
-    align-items: stretch;
+    /* Icon-only buttons share a size; flex-start keeps an unfolding label from widening the others. */
+    align-items: flex-start;
     gap: .5rem;
     z-index: 900;
 }
@@ -300,28 +300,24 @@ html { scroll-behavior: smooth; }
 .support-icon svg { display: block; width: 1.2em; height: 1.2em; margin: 0 auto; }
 .support-label { white-space: nowrap; }
 
-/* Mobile: round icon-only buttons; the label slides out on hover / tap / keyboard focus. */
-@media (max-width: 640px) {
-    /* Icon-only buttons already share a size; keep the unfolding label from widening the other one. */
-    .support-actions { align-items: flex-start; }
-    .support-actions .support-button { gap: 0; padding: .6rem; }
-    .support-actions .support-label {
-        max-width: 0;
-        overflow: hidden;
-        opacity: 0;
-        transition: max-width .25s ease, opacity .2s ease, margin .25s ease;
-    }
-    .support-actions .support-button:hover .support-label,
-    .support-actions .support-button:focus-visible .support-label {
-        max-width: 16rem;
-        margin-left: .45rem;
-        margin-right: .2rem;
-        opacity: 1;
-    }
+/* Round icon-only buttons; the label slides out on hover / tap / keyboard focus. */
+.support-actions .support-button { gap: 0; padding: .6rem; }
+.support-actions .support-label {
+    max-width: 0;
+    overflow: hidden;
+    opacity: 0;
+    transition: max-width .25s ease, opacity .2s ease, margin .25s ease;
+}
+.support-actions .support-button:hover .support-label,
+.support-actions .support-button:focus-visible .support-label {
+    max-width: 16rem;
+    margin-left: .45rem;
+    margin-right: .2rem;
+    opacity: 1;
 }
 
-@media (max-width: 640px) and (prefers-reduced-motion: reduce) {
-    .support-label { transition: none; }
+@media (prefers-reduced-motion: reduce) {
+    .support-actions .support-label { transition: none; }
 }
 
 .click-ripple {
@@ -352,6 +348,10 @@ html { scroll-behavior: smooth; }
     from { transform: scale(0); opacity: 1; }
     to { transform: scale(1); opacity: 0; }
 }
+
+/* Damage shockwave from the eye in game mode; its size is set inline to reach the screen corners. */
+.eye-shockwave { border-width: 6px; animation-duration: .7s; }
+.eye-shockwave::after { animation-duration: .7s; animation-delay: .1s; }
 
 @media (prefers-reduced-motion: reduce) {
     .click-ripple, .click-ripple::after { animation-duration: .01s; }
@@ -421,7 +421,8 @@ html { scroll-behavior: smooth; }
 body.is-game-mode { overflow: hidden; }
 .is-game-mode .hero,
 .is-game-mode .sections,
-.is-game-mode .back-to-top { display: none !important; }
+.is-game-mode .back-to-top,
+.is-game-mode .support-actions { display: none !important; }
 
 .is-game-mode .hero-eye,
 .is-game-mode .hero-eye.is-docked {
