@@ -74,7 +74,46 @@
 
 <main id="sections" class="sections"></main>
 
+<nav class="support-actions" aria-label="Support">
+    <button id="game-button" class="support-button support-button-game" type="button">
+        <span class="support-icon" aria-hidden="true"></span><span class="support-label" data-i18n="game-button">Destroy more incognito</span>
+    </button>
+    <button id="share-button" class="support-button support-button-share" type="button">
+        <span class="support-icon" aria-hidden="true">👁</span><span class="support-label" data-i18n="share-button">Open someone else's eyes</span>
+    </button>
+    <a id="kofi-link" class="support-button support-button-kofi js-kofi-link" target="_blank" rel="noopener" hidden>
+        <span class="support-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 10h12v4a5 5 0 0 1-5 5H9a5 5 0 0 1-5-5z"/><path d="M16 11.5h1.5a2.5 2.5 0 0 1 0 5H15.5"/><path d="M8 3.5q-1.2 1.5 0 3"/><path d="M12 3.5q-1.2 1.5 0 3"/></svg></span><span class="support-label" data-i18n="kofi-link">Thanks for opening my eyes</span>
+    </a>
+</nav>
+
 <button id="back-to-top" class="back-to-top" type="button" title="Back to top" aria-label="Back to top" hidden>↑</button>
+</div>
+
+<div id="game-hud" class="game-hud" hidden>
+    <div class="game-score-label" data-i18n="game-score-label">Score</div>
+    <div id="game-score" class="game-score">0</div>
+    <div id="game-lives" class="game-lives" role="img"></div>
+</div>
+
+<div id="game-over" class="game-over" hidden>
+    <div class="game-over-card" role="dialog" aria-modal="true" aria-labelledby="game-over-title">
+        <p class="game-over-greeting" data-i18n="game-over-greeting">Good game <span id="game-over-fingerprint" class="intro-fingerprint"></span></p>
+        <p class="game-over-reminder" data-i18n="game-over-reminder">Yes, we still know who you are.</p>
+        <h2 id="game-over-title" data-i18n="game-over-title">Game over</h2>
+        <p class="game-over-text" data-i18n="game-over-score">Incognito modes destroyed</p>
+        <p id="game-final-score" class="game-final-score">0</p>
+        <div class="game-over-actions">
+            <button id="game-home-button" class="support-button support-button-game" type="button">
+                <span class="support-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11.5 12 4l9 7.5"/><path d="M5.5 10v9.5h13V10"/><path d="M10 19.5v-5h4v5"/></svg></span><span class="support-label" data-i18n="game-home-button">Back to home</span>
+            </button>
+            <button id="game-share-button" class="support-button support-button-share" type="button">
+                <span class="support-icon" aria-hidden="true">👁</span><span class="support-label" data-i18n="game-share-button">Share my score</span>
+            </button>
+            <a class="support-button support-button-kofi js-kofi-link" target="_blank" rel="noopener" hidden>
+                <span class="support-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 10h12v4a5 5 0 0 1-5 5H9a5 5 0 0 1-5-5z"/><path d="M16 11.5h1.5a2.5 2.5 0 0 1 0 5H15.5"/><path d="M8 3.5q-1.2 1.5 0 3"/><path d="M12 3.5q-1.2 1.5 0 3"/></svg></span><span class="support-label" data-i18n="kofi-link">Thanks for opening my eyes</span>
+            </a>
+        </div>
+    </div>
 </div>
 
 <div id="toasts" class="toasts" aria-live="off"></div>

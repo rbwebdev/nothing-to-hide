@@ -21,6 +21,16 @@ const STATIC_TRANSLATIONS_FR = {
         ou <code>ipwho.is</code>).`,
     'hero-aside-server': `Un vrai site voit aussi, côté serveur et <strong>même si tu bloques JavaScript</strong> : ton IP, les en-têtes HTTP
         de chaque requête et l'empreinte de ta connexion chiffrée (TLS), très utilisée par les systèmes anti-bots.`,
+    'kofi-link': 'Merci de m\'avoir sensibilisé',
+    'share-button': 'Sensibiliser à mon tour',
+    'game-button': 'Détruire plus de navigations privées',
+    'game-score-label': 'Score',
+    'game-over-title': 'Game over',
+    'game-over-greeting': 'Bien joué <span id="game-over-fingerprint" class="intro-fingerprint"></span>',
+    'game-over-reminder': 'Oui, on sait toujours qui tu es.',
+    'game-over-score': 'Navigations privées détruites',
+    'game-home-button': 'Retour à l\'accueil',
+    'game-share-button': 'Partager mon score',
     'hero-aside-advice': `Pour réduire ton empreinte : un navigateur qui uniformise ou brouille ces valeurs (Tor Browser, Mullvad Browser,
         Brave, Firefox avec <code>privacy.resistFingerprinting</code>), un VPN pour l'IP, et refuser les permissions inutiles.
         Paradoxe : trop d'extensions anti-pistage rendent souvent ton empreinte <em>plus</em> unique.`,
@@ -1294,7 +1304,11 @@ const TOAST_DURATION_MS = 2500;
 const MAX_VISIBLE_TOASTS = 4;
 const EXCERPT_MAX_LENGTH = 40;
 
-function showToast(message) {
+function showToast(message, { evenInGameMode = false } = {}) {
+    // In game mode (playing or game over) toasts would only clutter the screen.
+    if (!evenInGameMode && document.body.classList.contains('is-game-mode')) {
+        return;
+    }
     const toasts = document.getElementById('toasts');
     const toast = document.createElement('div');
     toast.className = 'toast';
@@ -1694,7 +1708,10 @@ function makeEyeBlink() {
         const delay = MIN_BLINK_INTERVAL_MS + Math.random() * (MAX_BLINK_INTERVAL_MS - MIN_BLINK_INTERVAL_MS);
         setTimeout(() => eye.classList.add('is-blinking'), delay);
     };
-    const endBlink = () => {
+    const endBlink = (event) => {
+        if (event.animationName !== 'eye-blink') {
+            return;
+        }
         eye.classList.remove('is-blinking');
         scheduleNextBlink();
     };
@@ -1708,6 +1725,45 @@ function dockEyeWhenScrolled() {
     const toggleDocking = () => eye.classList.toggle('is-docked', window.scrollY > DOCK_AFTER_SCROLL_PX);
     window.addEventListener('scroll', toggleDocking, { passive: true });
     toggleDocking();
+}
+
+const SHARE_URL = 'https://nothing-to-hide.pages.dev';
+
+// Ko-fi page URL (e.g. 'https://ko-fi.com/yourname'). The button stays hidden while it is empty.
+const KOFI_URL = 'https://ko-fi.com/freesushi';
+
+function setUpSupportActions() {
+    if (KOFI_URL) {
+        document.querySelectorAll('.js-kofi-link').forEach((kofiLink) => {
+            kofiLink.href = KOFI_URL;
+            kofiLink.hidden = false;
+        });
+    }
+    document.getElementById('share-button').addEventListener('click', () => shareThisPage());
+}
+
+async function shareThisPage(text = t('Open this page. Don\'t click anything.', 'Ouvre cette page. Ne clique sur rien.')) {
+    // The link goes inside the text: many share targets drop the text when a separate url is given.
+    const message = `${text} ${SHARE_URL}`;
+    const shareData = { title: document.title, text: message };
+    if (navigator.share) {
+        try {
+            await navigator.share(shareData);
+            return;
+        } catch (error) {
+            if (error.name === 'AbortError') {
+                return;
+            }
+            console.error('Native share failed, falling back to clipboard', error);
+        }
+    }
+    try {
+        await navigator.clipboard.writeText(message);
+        showToast(t('Message copied. Send it to someone who has "nothing to hide".', 'Message copié. Envoie-le à quelqu\'un qui n\'a « rien à cacher ».'), { evenInGameMode: true });
+    } catch (error) {
+        console.error('Cannot copy link', error);
+        window.prompt(t('Copy this message:', 'Copie ce message :'), message);
+    }
 }
 
 function setUpBackToTop() {
@@ -1725,6 +1781,7 @@ function setUpBackToTop() {
 async function main() {
     trackBehaviour();
     setUpBackToTop();
+    setUpSupportActions();
     makeEyeFollowPointer();
     makeEyeBlink();
     dockEyeWhenScrolled();
@@ -1826,25 +1883,79 @@ const INCOGNITO_ICON_SVG = `
     <path d="M21 33 Q24 30 27 33" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"/>
 </svg>`;
 
+/* ---------- Incognito targets (shared by the ambient hunt and the game) ---------- */
+
+const INCOGNITO_SIZE_PX = 48;
+const LASER_DURATION_MS = 300;
+
+const randomBetween = (min, max) => min + Math.random() * (max - min);
+
+function eyeCenter() {
+    const eyeBounds = document.getElementById('hero-eye').getBoundingClientRect();
+    return { x: eyeBounds.left + eyeBounds.width / 2, y: eyeBounds.top + eyeBounds.height / 2 };
+}
+
+function fireLaser(point) {
+    const origin = eyeCenter();
+    const beam = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+    beam.setAttribute('x1', origin.x);
+    beam.setAttribute('y1', origin.y);
+    beam.setAttribute('x2', point.x);
+    beam.setAttribute('y2', point.y);
+    beam.setAttribute('class', 'laser-beam');
+    document.getElementById('laser-layer').appendChild(beam);
+    setTimeout(() => beam.remove(), LASER_DURATION_MS);
+}
+
+function createIncognitoTarget() {
+    const target = document.createElement('button');
+    target.type = 'button';
+    target.className = 'incognito-target';
+    target.title = t('Incognito mode. Shoot it!', 'Navigation privée. Tire dessus !');
+    target.setAttribute('aria-label', target.title);
+    target.innerHTML = INCOGNITO_ICON_SVG;
+    document.body.appendChild(target);
+    return target;
+}
+
+function placeIncognitoTarget(target, x, y) {
+    target.style.transform = `translate(${x}px, ${y}px)`;
+}
+
+function incognitoTargetCenter(target) {
+    const bounds = target.getBoundingClientRect();
+    return { x: bounds.left + bounds.width / 2, y: bounds.top + bounds.height / 2 };
+}
+
+function retireIncognitoTarget(target, endingClass) {
+    target.disabled = true;
+    target.classList.add(endingClass);
+    target.addEventListener('animationend', () => target.remove(), { once: true });
+}
+
+function onIncognitoShot(target, shoot) {
+    target.addEventListener('pointerdown', shoot);
+    target.addEventListener('click', shoot);
+}
+
+/* ---------- Ambient hunt: a few targets wander while you read ---------- */
+
 function startIncognitoHunt() {
     const FIRST_SPAWN_DELAY_MS = 2000;
     const MIN_RESPAWN_DELAY_MS = 6000;
     const MAX_RESPAWN_DELAY_MS = 15000;
     const MAX_ALIVE_TARGETS = 5;
-    const ICON_SIZE_PX = 48;
     const MIN_SPEED_PX_PER_S = 25;
     const MAX_SPEED_PX_PER_S = 50;
     const MAX_TURN_RAD_PER_S = 1;
-    const LASER_DURATION_MS = 300;
     const SPAWN_ZONE_WIDTH_RATIO = 0.25;
     const SPAWN_ZONE_TOP_RATIO = 0.6;
     const isMotionReduced = matchesMedia('(prefers-reduced-motion: reduce)');
-    const laserLayer = document.getElementById('laser-layer');
+    const aliveWanderers = new Set();
     let eliminatedCount = 0;
-    let aliveCount = 0;
     let pendingSpawnTimer = null;
+    let isPaused = false;
 
-    const randomBetween = (min, max) => min + Math.random() * (max - min);
     const scheduleSpawn = (delay) => {
         pendingSpawnTimer = setTimeout(spawnAndScheduleNext, delay);
     };
@@ -1852,38 +1963,21 @@ function startIncognitoHunt() {
 
     function spawnAndScheduleNext() {
         pendingSpawnTimer = null;
-        spawnIncognito();
-        if (aliveCount < MAX_ALIVE_TARGETS) {
+        spawnWanderer();
+        if (aliveWanderers.size < MAX_ALIVE_TARGETS) {
             scheduleNextSpawn();
         }
     }
 
-    function resumeSpawningIfPaused() {
-        if (pendingSpawnTimer === null) {
+    function resumeSpawningIfStalled() {
+        if (!isPaused && pendingSpawnTimer === null) {
             scheduleNextSpawn();
         }
-    }
-
-    function eyeCenter() {
-        const eyeBounds = document.getElementById('hero-eye').getBoundingClientRect();
-        return { x: eyeBounds.left + eyeBounds.width / 2, y: eyeBounds.top + eyeBounds.height / 2 };
-    }
-
-    function fireLaser(target) {
-        const origin = eyeCenter();
-        const beam = document.createElementNS('http://www.w3.org/2000/svg', 'line');
-        beam.setAttribute('x1', origin.x);
-        beam.setAttribute('y1', origin.y);
-        beam.setAttribute('x2', target.x);
-        beam.setAttribute('y2', target.y);
-        beam.setAttribute('class', 'laser-beam');
-        laserLayer.appendChild(beam);
-        setTimeout(() => beam.remove(), LASER_DURATION_MS);
     }
 
     function pickBottomCornerSpawnPoint() {
-        const maxX = window.innerWidth - ICON_SIZE_PX;
-        const maxY = window.innerHeight - ICON_SIZE_PX;
+        const maxX = window.innerWidth - INCOGNITO_SIZE_PX;
+        const maxY = window.innerHeight - INCOGNITO_SIZE_PX;
         const zoneWidth = maxX * SPAWN_ZONE_WIDTH_RATIO;
         const isLeftCorner = Math.random() < 0.5;
         return {
@@ -1892,76 +1986,301 @@ function startIncognitoHunt() {
         };
     }
 
-    function spawnIncognito() {
-        let { x, y } = pickBottomCornerSpawnPoint();
-        let heading = randomBetween(0, Math.PI * 2);
-        const speed = isMotionReduced ? 0 : randomBetween(MIN_SPEED_PX_PER_S, MAX_SPEED_PX_PER_S);
+    function spawnWanderer() {
+        const wanderer = {
+            target: createIncognitoTarget(),
+            ...pickBottomCornerSpawnPoint(),
+            heading: randomBetween(0, Math.PI * 2),
+            speed: isMotionReduced ? 0 : randomBetween(MIN_SPEED_PX_PER_S, MAX_SPEED_PX_PER_S),
+            isEnded: false,
+        };
+        aliveWanderers.add(wanderer);
         let lastFrameAt = null;
-        let isEnded = false;
-        aliveCount++;
 
-        const target = document.createElement('button');
-        target.type = 'button';
-        target.className = 'incognito-target';
-        target.title = t('Incognito mode. Shoot it!', 'Navigation privée. Tire dessus !');
-        target.setAttribute('aria-label', t('Incognito mode. Shoot it!', 'Navigation privée. Tire dessus !'));
-        target.innerHTML = INCOGNITO_ICON_SVG;
-        document.body.appendChild(target);
-
-        const placeTarget = () => {
-            target.style.transform = `translate(${x}px, ${y}px)`;
-        };
         const bounceOffEdges = () => {
-            const boundX = window.innerWidth - ICON_SIZE_PX;
-            const boundY = window.innerHeight - ICON_SIZE_PX;
-            if (x < 0 || x > boundX) {
-                heading = Math.PI - heading;
-                x = Math.min(Math.max(x, 0), boundX);
+            const boundX = window.innerWidth - INCOGNITO_SIZE_PX;
+            const boundY = window.innerHeight - INCOGNITO_SIZE_PX;
+            if (wanderer.x < 0 || wanderer.x > boundX) {
+                wanderer.heading = Math.PI - wanderer.heading;
+                wanderer.x = Math.min(Math.max(wanderer.x, 0), boundX);
             }
-            if (y < 0 || y > boundY) {
-                heading = -heading;
-                y = Math.min(Math.max(y, 0), boundY);
+            if (wanderer.y < 0 || wanderer.y > boundY) {
+                wanderer.heading = -wanderer.heading;
+                wanderer.y = Math.min(Math.max(wanderer.y, 0), boundY);
             }
-        };
-        const endWith = (endingClass) => {
-            isEnded = true;
-            target.disabled = true;
-            target.classList.add(endingClass);
-            target.addEventListener('animationend', () => target.remove(), { once: true });
-            aliveCount--;
-            resumeSpawningIfPaused();
         };
         const wander = (frameAt) => {
-            if (isEnded) {
+            if (wanderer.isEnded) {
                 return;
             }
             const elapsedSeconds = lastFrameAt === null ? 0 : Math.min((frameAt - lastFrameAt) / 1000, 0.1);
             lastFrameAt = frameAt;
-            heading += randomBetween(-MAX_TURN_RAD_PER_S, MAX_TURN_RAD_PER_S) * elapsedSeconds;
-            x += Math.cos(heading) * speed * elapsedSeconds;
-            y += Math.sin(heading) * speed * elapsedSeconds;
+            wanderer.heading += randomBetween(-MAX_TURN_RAD_PER_S, MAX_TURN_RAD_PER_S) * elapsedSeconds;
+            wanderer.x += Math.cos(wanderer.heading) * wanderer.speed * elapsedSeconds;
+            wanderer.y += Math.sin(wanderer.heading) * wanderer.speed * elapsedSeconds;
             bounceOffEdges();
-            placeTarget();
+            placeIncognitoTarget(wanderer.target, wanderer.x, wanderer.y);
             requestAnimationFrame(wander);
         };
         const shoot = () => {
-            if (isEnded) {
+            if (wanderer.isEnded) {
                 return;
             }
-            const targetBounds = target.getBoundingClientRect();
-            fireLaser({ x: targetBounds.left + targetBounds.width / 2, y: targetBounds.top + targetBounds.height / 2 });
+            fireLaser(incognitoTargetCenter(wanderer.target));
+            wanderer.isEnded = true;
+            aliveWanderers.delete(wanderer);
+            retireIncognitoTarget(wanderer.target, 'is-hit');
             eliminatedCount++;
-            endWith('is-hit');
             showToast(t(`Incognito mode eliminated. Score: ${eliminatedCount}`, `Navigation privée éliminée. Score : ${eliminatedCount}`));
+            resumeSpawningIfStalled();
         };
 
-        target.addEventListener('pointerdown', shoot);
-        target.addEventListener('click', shoot);
-        placeTarget();
+        onIncognitoShot(wanderer.target, shoot);
+        placeIncognitoTarget(wanderer.target, wanderer.x, wanderer.y);
         requestAnimationFrame(wander);
     }
 
     scheduleSpawn(FIRST_SPAWN_DELAY_MS);
+
+    return {
+        pause() {
+            isPaused = true;
+            clearTimeout(pendingSpawnTimer);
+            pendingSpawnTimer = null;
+            aliveWanderers.forEach((wanderer) => {
+                wanderer.isEnded = true;
+                retireIncognitoTarget(wanderer.target, 'is-leaving');
+            });
+            aliveWanderers.clear();
+        },
+        resume() {
+            if (!isPaused) {
+                return;
+            }
+            isPaused = false;
+            scheduleSpawn(FIRST_SPAWN_DELAY_MS);
+        },
+    };
+}
+
+/* ---------- Game mode: defend the eye ---------- */
+
+function setUpIncognitoGame(ambientHunt, fingerprintHash) {
+    const LIVES = 3;
+    const FIRST_SPAWN_DELAY_MS = 700;
+    const START_SPAWN_INTERVAL_MS = 1600;
+    const MIN_SPAWN_INTERVAL_MS = 600;
+    const SPAWN_INTERVAL_DECAY_MS_PER_S = 10;
+    const START_MAX_ALIVE = 3;
+    const MAX_ALIVE_CAP = 10;
+    const MAX_ALIVE_GROWTH_EVERY_S = 15;
+    const START_SPEED_PX_PER_S = 45;
+    const MAX_SPEED_PX_PER_S = 170;
+    const SPEED_GROWTH_PX_PER_S2 = 1.5;
+    const SPEED_SPREAD = 0.2;
+    const TURN_RATE_RAD_PER_S = 2.2;
+    const JITTER_RAD_PER_S = 1.5;
+    const EYE_HIT_RADIUS_PX = 50;
+    const HALF_SIZE = INCOGNITO_SIZE_PX / 2;
+
+    const eye = document.getElementById('hero-eye');
+    const hud = document.getElementById('game-hud');
+    const scoreValue = document.getElementById('game-score');
+    const livesElement = document.getElementById('game-lives');
+    const gameOver = document.getElementById('game-over');
+    const finalScore = document.getElementById('game-final-score');
+    const homeButton = document.getElementById('game-home-button');
+    let game = null;
+
+    const normaliseAngle = (angle) => Math.atan2(Math.sin(angle), Math.cos(angle));
+    const clamp = (value, min, max) => Math.min(Math.max(value, min), max);
+
+    function renderHud() {
+        scoreValue.textContent = game.score;
+        const hearts = Array.from({ length: LIVES }, (_, index) => {
+            const heart = document.createElement('span');
+            heart.className = index < game.lives ? 'game-heart' : 'game-heart is-lost';
+            heart.textContent = '♥';
+            return heart;
+        });
+        livesElement.replaceChildren(...hearts);
+        livesElement.setAttribute('aria-label', t(`${game.lives} lives left`, `${game.lives} vie(s) restante(s)`));
+    }
+
+    function levelAt(now) {
+        const seconds = (now - game.startedAt) / 1000;
+        return {
+            spawnIntervalMs: Math.max(MIN_SPAWN_INTERVAL_MS, START_SPAWN_INTERVAL_MS - seconds * SPAWN_INTERVAL_DECAY_MS_PER_S),
+            maxAlive: Math.min(MAX_ALIVE_CAP, START_MAX_ALIVE + Math.floor(seconds / MAX_ALIVE_GROWTH_EVERY_S)),
+            speed: Math.min(MAX_SPEED_PX_PER_S, START_SPEED_PX_PER_S + seconds * SPEED_GROWTH_PX_PER_S2),
+        };
+    }
+
+    function pickEdgeSpawnPoint() {
+        const maxX = window.innerWidth - INCOGNITO_SIZE_PX;
+        const maxY = window.innerHeight - INCOGNITO_SIZE_PX;
+        const edges = [
+            () => ({ x: randomBetween(0, maxX), y: 0 }),
+            () => ({ x: randomBetween(0, maxX), y: maxY }),
+            () => ({ x: 0, y: randomBetween(0, maxY) }),
+            () => ({ x: maxX, y: randomBetween(0, maxY) }),
+        ];
+        return edges[Math.floor(Math.random() * edges.length)]();
+    }
+
+    function spawnAttacker(speed) {
+        const { x, y } = pickEdgeSpawnPoint();
+        const eyePoint = eyeCenter();
+        const attacker = {
+            target: createIncognitoTarget(),
+            x,
+            y,
+            heading: Math.atan2(eyePoint.y - (y + HALF_SIZE), eyePoint.x - (x + HALF_SIZE)),
+            speed: speed * randomBetween(1 - SPEED_SPREAD, 1 + SPEED_SPREAD),
+            isEnded: false,
+        };
+        attacker.target.classList.add('is-attacking');
+        onIncognitoShot(attacker.target, () => shootAttacker(attacker));
+        placeIncognitoTarget(attacker.target, x, y);
+        game.attackers.add(attacker);
+    }
+
+    function removeAttacker(attacker, endingClass) {
+        attacker.isEnded = true;
+        game.attackers.delete(attacker);
+        retireIncognitoTarget(attacker.target, endingClass);
+    }
+
+    function shootAttacker(attacker) {
+        if (attacker.isEnded || !game || game.isOver) {
+            return;
+        }
+        fireLaser(incognitoTargetCenter(attacker.target));
+        removeAttacker(attacker, 'is-hit');
+        game.score++;
+        renderHud();
+    }
+
+    function hurtEye(attacker) {
+        removeAttacker(attacker, 'is-impact');
+        game.lives--;
+        renderHud();
+        eye.classList.remove('is-damaged');
+        void eye.getBoundingClientRect(); // Restart the damage animation when hits come in quick succession.
+        eye.classList.add('is-damaged');
+        if (game.lives <= 0) {
+            finishGame();
+        }
+    }
+
+    function moveAttacker(attacker, eyePoint, elapsedSeconds) {
+        const desiredHeading = Math.atan2(eyePoint.y - (attacker.y + HALF_SIZE), eyePoint.x - (attacker.x + HALF_SIZE));
+        const maxTurn = TURN_RATE_RAD_PER_S * elapsedSeconds;
+        attacker.heading += clamp(normaliseAngle(desiredHeading - attacker.heading), -maxTurn, maxTurn);
+        attacker.heading += randomBetween(-JITTER_RAD_PER_S, JITTER_RAD_PER_S) * elapsedSeconds;
+        attacker.x += Math.cos(attacker.heading) * attacker.speed * elapsedSeconds;
+        attacker.y += Math.sin(attacker.heading) * attacker.speed * elapsedSeconds;
+        placeIncognitoTarget(attacker.target, attacker.x, attacker.y);
+        return Math.hypot(eyePoint.x - (attacker.x + HALF_SIZE), eyePoint.y - (attacker.y + HALF_SIZE)) < EYE_HIT_RADIUS_PX;
+    }
+
+    function tick(now) {
+        if (!game || game.isOver) {
+            return;
+        }
+        const elapsedSeconds = game.lastFrameAt === null ? 0 : Math.min((now - game.lastFrameAt) / 1000, 0.1);
+        game.lastFrameAt = now;
+        const level = levelAt(now);
+        if (now >= game.nextSpawnAt && game.attackers.size < level.maxAlive) {
+            spawnAttacker(level.speed);
+            game.nextSpawnAt = now + level.spawnIntervalMs;
+        }
+        const eyePoint = eyeCenter();
+        for (const attacker of [...game.attackers]) {
+            if (moveAttacker(attacker, eyePoint, elapsedSeconds)) {
+                hurtEye(attacker);
+                if (game.isOver) {
+                    return;
+                }
+            }
+        }
+        game.frame = requestAnimationFrame(tick);
+    }
+
+    function clearAttackers() {
+        cancelAnimationFrame(game.frame);
+        [...game.attackers].forEach((attacker) => removeAttacker(attacker, 'is-leaving'));
+    }
+
+    function startGame() {
+        if (game && !game.isOver) {
+            return;
+        }
+        ambientHunt.pause();
+        document.getElementById('toasts').replaceChildren();
+        document.body.classList.add('is-game-mode');
+        window.scrollTo({ top: 0, behavior: 'instant' });
+        const now = performance.now();
+        game = {
+            score: 0,
+            lives: LIVES,
+            startedAt: now,
+            lastFrameAt: null,
+            nextSpawnAt: now + FIRST_SPAWN_DELAY_MS,
+            attackers: new Set(),
+            frame: null,
+            isOver: false,
+        };
+        renderHud();
+        gameOver.hidden = true;
+        hud.hidden = false;
+        game.frame = requestAnimationFrame(tick);
+    }
+
+    function finishGame() {
+        game.isOver = true;
+        clearAttackers();
+        finalScore.textContent = game.score;
+        document.getElementById('game-over-fingerprint').textContent = fingerprintHash;
+        gameOver.hidden = false;
+        homeButton.focus();
+    }
+
+    function backToHome() {
+        if (!game) {
+            return;
+        }
+        if (!game.isOver) {
+            game.isOver = true;
+            clearAttackers();
+        }
+        game = null;
+        gameOver.hidden = true;
+        hud.hidden = true;
+        eye.classList.remove('is-damaged');
+        document.body.classList.remove('is-game-mode');
+        window.scrollTo({ top: 0, behavior: 'instant' });
+        ambientHunt.resume();
+    }
+
+    function shareScore() {
+        const score = game ? game.score : 0;
+        const destroyed = t(
+            `I destroyed ${score} incognito mode${score === 1 ? '' : 's'}.`,
+            `J'ai détruit ${score} navigation${score > 1 ? 's' : ''} privée${score > 1 ? 's' : ''}.`,
+        );
+        shareThisPage(`${destroyed} ${t('Your turn. Open this page. Don\'t click anything.', 'À ton tour. Ouvre cette page. Ne clique sur rien.')}`);
+    }
+
+    document.querySelector('#game-button .support-icon').innerHTML = INCOGNITO_ICON_SVG;
+    document.getElementById('game-button').addEventListener('click', startGame);
+    homeButton.addEventListener('click', backToHome);
+    document.getElementById('game-share-button').addEventListener('click', shareScore);
+    window.addEventListener('keydown', (event) => {
+        if (event.key === 'Escape') {
+            backToHome();
+        }
+    });
 }
 
 function clearUrlHash() {
@@ -1985,7 +2304,7 @@ function showWelcome(fingerprintHash) {
         window.scrollTo({ top: 0 });
         setUpInteractionFeedback();
         setUpAttentionFeedback();
-        startIncognitoHunt();
+        setUpIncognitoGame(startIncognitoHunt(), fingerprintHash);
     };
     document.getElementById('intro-fingerprint').textContent = fingerprintHash;
     document.getElementById('intro-loader').remove();
